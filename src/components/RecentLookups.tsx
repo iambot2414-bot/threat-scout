@@ -1,10 +1,12 @@
 import { IOCResult } from '@/types/threat';
 import { cn } from '@/lib/utils';
 import { Server, Globe, Hash, Link2, ChevronRight } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface RecentLookupsProps {
   lookups: IOCResult[];
   onSelect: (result: IOCResult) => void;
+  isLoading?: boolean;
 }
 
 const typeIcons = {
@@ -22,8 +24,40 @@ const levelColors = {
   info: 'bg-threat-info',
 };
 
-export function RecentLookups({ lookups, onSelect }: RecentLookupsProps) {
-  if (lookups.length === 0) return null;
+export function RecentLookups({ lookups, onSelect, isLoading }: RecentLookupsProps) {
+  if (isLoading) {
+    return (
+      <div className="glass rounded-xl p-5 card-glow">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-4">
+          RECENT LOOKUPS
+        </h3>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="w-8 h-8 rounded-lg" />
+              <div className="flex-1">
+                <Skeleton className="h-4 w-32 mb-1" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (lookups.length === 0) {
+    return (
+      <div className="glass rounded-xl p-5 card-glow">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-4">
+          RECENT LOOKUPS
+        </h3>
+        <p className="text-sm text-muted-foreground text-center py-4">
+          No recent lookups yet
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="glass rounded-xl p-5 card-glow">
