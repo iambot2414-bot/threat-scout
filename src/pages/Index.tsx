@@ -4,76 +4,81 @@ import { IOCLookup } from '@/components/IOCLookup';
 import { StatsCards } from '@/components/StatsCards';
 import { IOCResultCard } from '@/components/IOCResultCard';
 import { RecentLookups } from '@/components/RecentLookups';
-import { mockIOCResults, mockStats } from '@/data/mockData';
-import { IOCResult, IOCType } from '@/types/threat';
+import { IOCResult, IOCType, LookupStats } from '@/types/threat';
 import { toast } from 'sonner';
+import { useStats, useRecentLookups, useIOCLookup, useHealthCheck } from '@/hooks/useThreatAPI';
 
 const Index = () => {
-  const [isLoading, setIsLoading] = useState(false);
   const [currentResult, setCurrentResult] = useState<IOCResult | null>(null);
-  const [recentLookups, setRecentLookups] = useState<IOCResult[]>(mockIOCResults.slice(0, 5));
+  
+  // API hooks
+  const { data: stats, isLoading: statsLoading, error: statsError } = useStats();
+  const { data: recentLookups = [], isLoading: lookupsLoading } = useRecentLookups(5);
+  const { data: health } = useHealthCheck();
+  const lookupMutation = useIOCLookup();
+
+  // Default stats fallback
+  const defaultStats: LookupStats = {
+    totalLookups: 0,
+    threatsDetected: 0,
+    criticalThreats: 0,
+    activeSources: 3
+  };
 
   const handleSearch = async (value: string, type: IOCType) => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Find mock result or generate a demo one
-    const foundResult = mockIOCResults.find(
-      r => r.value.toLowerCase() === value.toLowerCase() || r.type === type
+    lookupMutation.mutate(
+      { value, type },
+      {
+        onSuccess: (result) => {
+          setCurrentResult(result);
+          if (result.threatLevel === 'critical' || result.threatLevel === 'high') {
+            toast.warning(`Threat detected for ${value}`, {
+              description: `Threat Level: ${result.threatLevel.toUpperCase()}`
+            });
+          } else {
+            toast.success(`Analysis complete for ${value}`);
+          }
+        },
+        onError: (error) => {
+          toast.error('Failed to analyze IOC', {
+            description: error instanceof Error ? error.message : 'Please check your backend connection'
+          });
+        }
+      }
     );
-    
-    if (foundResult) {
-      const result = { ...foundResult, value, type };
-      setCurrentResult(result);
-      setRecentLookups(prev => [result, ...prev.filter(r => r.id !== result.id)].slice(0, 5));
-      toast.success(`Analysis complete for ${value}`);
-    } else {
-      // Generate a clean result for unknown IOCs
-      const cleanResult: IOCResult = {
-        id: Date.now().toString(),
-        value,
-        type,
-        threatScore: Math.floor(Math.random() * 30),
-        threatLevel: 'low',
-        confidence: 'MEDIUM',
-        sources: [
-          { name: 'AbuseIPDB', detected: false },
-          { name: 'VirusTotal', detected: false },
-          { name: 'AlienVault OTX', detected: false },
-        ],
-        tags: ['unknown'],
-        firstSeen: new Date().toISOString(),
-        lastSeen: new Date().toISOString(),
-        pulseCount: 0,
-      };
-      setCurrentResult(cleanResult);
-      toast.info(`No known threats found for ${value}`);
-    }
-    
-    setIsLoading(false);
   };
 
   const handleSelectRecent = (result: IOCResult) => {
     setCurrentResult(result);
   };
 
+  const isBackendConnected = health?.status === 'ok';
+
   return (
     <div className="min-h-screen grid-pattern">
       <Header />
       
       <main className="container mx-auto px-4 py-8">
+        {/* Backend Status Banner */}
+        {statsError && (
+          <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+            <p className="font-medium">⚠️ Backend not connected</p>
+            <p className="text-sm mt-1">
+              Start your Express backend at <code className="bg-background px-2 py-1 rounded">http://localhost:5000</code>
+            </p>
+          </div>
+        )}
+
         {/* Stats Overview */}
         <section className="mb-8">
-          <StatsCards stats={mockStats} />
+          <StatsCards stats={stats || defaultStats} isLoading={statsLoading} />
         </section>
 
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-4 gap-6">
           {/* Lookup & Results Column */}
           <div className="lg:col-span-3 space-y-6">
-            <IOCLookup onSearch={handleSearch} isLoading={isLoading} />
+            <IOCLookup onSearch={handleSearch} isLoading={lookupMutation.isPending} />
             
             {currentResult && (
               <IOCResultCard result={currentResult} />
@@ -101,7 +106,11 @@ const Index = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <RecentLookups lookups={recentLookups} onSelect={handleSelectRecent} />
+            <RecentLookups 
+              lookups={recentLookups} 
+              onSelect={handleSelectRecent} 
+              isLoading={lookupsLoading}
+            />
 
             {/* Quick Actions */}
             <div className="glass rounded-xl p-5 card-glow">
@@ -127,6 +136,15 @@ const Index = () => {
                 API STATUS
               </h3>
               <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">Backend Server</span>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isBackendConnected ? 'bg-success animate-pulse' : 'bg-destructive'}`} />
+                    <span className={`text-xs ${isBackendConnected ? 'text-success' : 'text-destructive'}`}>
+                      {isBackendConnected ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
+                </div>
                 {[
                   { name: 'AbuseIPDB', status: 'online' },
                   { name: 'VirusTotal', status: 'online' },

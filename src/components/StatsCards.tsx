@@ -1,9 +1,11 @@
 import { LookupStats } from '@/types/threat';
 import { Activity, AlertTriangle, ShieldAlert, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface StatsCardsProps {
   stats: LookupStats;
+  isLoading?: boolean;
 }
 
 const statConfig = [
@@ -37,7 +39,7 @@ const statConfig = [
   },
 ];
 
-export function StatsCards({ stats }: StatsCardsProps) {
+export function StatsCards({ stats, isLoading }: StatsCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {statConfig.map(({ key, label, icon: Icon, color, bgColor }, index) => (
@@ -51,9 +53,13 @@ export function StatsCards({ stats }: StatsCardsProps) {
               <Icon className={cn('w-5 h-5', color)} />
             </div>
           </div>
-          <p className={cn('text-2xl font-bold font-mono', color)}>
-            {stats[key].toLocaleString()}
-          </p>
+          {isLoading ? (
+            <Skeleton className="h-8 w-16 mb-1" />
+          ) : (
+            <p className={cn('text-2xl font-bold font-mono', color)}>
+              {stats[key].toLocaleString()}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mt-1">{label}</p>
         </div>
       ))}
